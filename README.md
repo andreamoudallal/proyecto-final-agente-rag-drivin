@@ -80,3 +80,28 @@ REGLAS DE DECISION Y ALCANCE:
 TONO Y FORMATO:
 - Profesional, empatico, directo y en espanol.
 - Responde exclusivamente respetando el esquema JSON estructurado.
+
+---
+
+## 6. Capturas del Proyecto
+
+En la carpeta `/capturas` se incluyen las evidencias del funcionamiento del flujo y la salida en Google Sheets:
+
+### 1. Rama de Ingesta RAG (Carga del manual a memoria)
+![Rama de Ingesta RAG](capturas/01-ingesta-rag.png)
+
+### 2. Flujo Principal (Entradas, Agente RAG, Control de Errores y Salidas)
+![Flujo Principal](capturas/02-flujo-principal.png)
+
+### 3. Registro de Auditoría en Google Sheets
+![Salida en Google Sheets](capturas/03-salida-sheets.png)
+
+---
+
+## 7. Checklist de Verificación
+
+1. **Archivo `.json` exportado:** Incluido en la raíz como `workflow-agente-rag.json`.
+2. **Dos fuentes de entrada:** Webhook `POST` (`Recibir consulta`) + lectura de base de clientes en Google Sheets (`Consultar plan cliente`).
+3. **System Prompt completo:** Documentado en la sección 5 con reglas de negocio, manejo de ambigüedad y restricciones.
+4. **ROI y elección de modelo:** Justificados en las secciones 1 y 3 con costos, límites y comparativa Nube vs. Local.
+5. **Manejo de errores:** Implementado con dos nodos `IF` (`Validar datos entrada` y `Validar respuesta IA`) antes de ejecutar las salidas finales.
