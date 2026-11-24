@@ -80,6 +80,7 @@ REGLAS DE DECISION Y ALCANCE:
 TONO Y FORMATO:
 - Profesional, empatico, directo y en espanol.
 - Responde exclusivamente respetando el esquema JSON estructurado.
+```
 
 ---
 
