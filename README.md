@@ -28,9 +28,9 @@ Automatizar escala mucho mejor que sumar analistas porque el flujo atiende consu
 
 ## 2. Cómo funciona el Workflow
 
-El flujo en n8n está separado en dos partes:
+El flujo en n8n está separado en dos ramas principales con notas explicativas (*Sticky Notes*) en cada bloque:
 
-1. **Rama de carga (Ingesta RAG):** Toma el manual operativo de Drivin, lo divide en fragmentos con `Recursive Character Text Splitter` (chunks de 400 caracteres con solapamiento de 50), genera los vectores con `Gemini Embeddings` y los guarda en memoria bajo la clave `drivin_faq_store`. Esta rama se corre cada vez que se actualiza la documentación.
+1. **Rama de carga (Ingesta RAG):** Toma el manual operativo de Drivin, lo divide en fragmentos con `Recursive Character Text Splitter` (chunks de 400 caracteres con solapamiento de 50), genera los vectores con `Gemini Embeddings` y los guarda en memoria bajo la clave `drivin_faq_store`. Esta rama se ejecuta cada vez que se actualiza la documentación.
 2. **Rama de atención y decisión:**
    * **Entrada 1 (`Recibir consulta`):** Webhook `POST` que recibe `sessionId`, `cliente_email` y `mensaje`.
    * **Validación de entrada (`Validar datos entrada`):** Nodo `IF` que frena peticiones incompletas antes de gastar tokens.
@@ -43,7 +43,7 @@ El flujo en n8n está separado en dos partes:
 ## 3. Decisiones Técnicas
 
 ### ¿Por qué un AI Agent con RAG y no un nodo de IA simple?
-* **Por qué RAG:** Meter todo el manual operativo dentro del prompt encarece cada consulta y hace que el modelo pierda precisión. Con RAG solo se recuperan los párrafos que realmente tienen relación con lo que pregunta el usuario.
+* **Por qué RAG:** Incluir todo el manual operativo dentro del prompt encarece cada consulta y hace que el modelo pierda precisión. Con RAG solo se recuperan los párrafos que realmente tienen relación con lo que pregunta el usuario.
 * **Por qué un AI Agent:** Un nodo de IA simple solo redacta texto. Acá el sistema necesita **tomar decisiones según reglas de negocio**: primero consulta la herramienta de documentación, luego evalúa el estado de la cuenta que viene de Google Sheets (por ejemplo, si el cliente está `Suspendido`, bloquea el soporte técnico y lo deriva a facturación; si es `Enterprise` con fallo de API, le da prioridad `Alta`) y finalmente entrega un JSON limpio para automatizar el registro.
 
 ### Elección del modelo: Nube (Google Gemini) vs. Local (Ollama)
