@@ -86,16 +86,14 @@ TONO Y FORMATO:
 
 ## 6. Capturas del Proyecto
 
-En la carpeta `/capturas` se incluyen las evidencias del funcionamiento del flujo y la salida en Google Sheets:
-
 ### 1. Rama de Ingesta RAG (Carga del manual a memoria)
-![Rama de Ingesta RAG](capturas/01-ingesta-rag.png)
+![Rama de Ingesta RAG](01-ingesta-rag.png)
 
 ### 2. Flujo Principal (Entradas, Agente RAG, Control de Errores y Salidas)
-![Flujo Principal](capturas/02-flujo-principal.png)
+![Flujo Principal](02-flujo-principal.png)
 
 ### 3. Registro de Auditoría en Google Sheets
-![Salida en Google Sheets](capturas/03-salida-sheets.png)
+![Salida en Google Sheets](03-salida-sheets.png)
 
 ---
 
