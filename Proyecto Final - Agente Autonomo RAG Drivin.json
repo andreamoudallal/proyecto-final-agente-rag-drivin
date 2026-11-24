@@ -1,0 +1,931 @@
+{
+  "name": "Proyecto Final - Agente Autonomo RAG Drivin",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "613deaf7-5224-495a-b106-cf4e8d8c4b91",
+      "name": "Inicio carga",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Inicia manualmente la carga o actualizacion del manual de Drivin en la memoria vectorial."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "doc-faq-1",
+              "name": "text",
+              "value": "MANUAL OPERATIVO DRIVIN - SOPORTE NIVEL 1:\n1. REASIGNACION DE RUTAS EN APP MOVIL: Los conductores con rol Conductor Estandar NO pueden reasignar ni transferir paradas a otro vehiculo desde la app movil. Solo los usuarios con perfil Supervisor o Planificador desde la consola web de Drivin pueden mover paradas entre rutas activas.\n2. PRUEBA DE ENTREGA (POD): Para cerrar una entrega como exitosa en la app Drivin, es obligatorio capturar al menos una fotografia nitida o firma digital dentro del radio de la geocerca (50 metros por defecto). Si no hay señal de internet, la app guarda el POD en modo offline y sincroniza automaticamente al recuperar conexion.\n3. GEOCERCAS Y DIRECCIONES: Si una direccion no geocodifica correctamente al importar planillas Excel, se debe verificar que las columnas Latitud y Longitud esten en formato decimal con punto (ej. -33.4489) y no con coma.\n4. POLITICA DE ESCALACION Y SLA: Clientes con plan Enterprise tienen prioridad Alta en fallos de integracion API/ERP o caidas de sincronizacion. Clientes con estado_cuenta Suspendido no pueden recibir soporte operativo ni apertura de rutas hasta regularizar facturacion con su ejecutivo.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "43169356-e512-495d-857b-09902f530666",
+      "name": "Texto FAQ Drivin",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ],
+      "notes": "Contiene el manual operativo y politicas de SLA de Drivin."
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "memoryKey": "drivin_faq_store"
+      },
+      "id": "585b5521-7b3c-4129-bc8e-9c632d210b07",
+      "name": "Guardar en memoria",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1,
+      "position": [
+        464,
+        0
+      ],
+      "notes": "Indexa los fragmentos vectorizados del manual en drivin_faq_store."
+    },
+    {
+      "parameters": {},
+      "id": "11ac812f-2197-43dd-963a-721829ad160b",
+      "name": "Embeddings texto",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        336,
+        208
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "syRQm9shU3QemMSZ",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "notes": "Genera vectores numericos del manual usando Gemini Embeddings."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "e63c4392-25c0-4b21-9508-1692e65e132e",
+      "name": "Cargador de datos",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        576,
+        208
+      ],
+      "notes": "Prepara el texto del manual para dividirlo en fragmentos."
+    },
+    {
+      "parameters": {
+        "chunkSize": 400,
+        "chunkOverlap": 50,
+        "options": {}
+      },
+      "id": "d6a88569-0a2c-4bc6-a580-ad4df8ab2657",
+      "name": "Divisor de texto",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        576,
+        368
+      ],
+      "notes": "Divide el manual en bloques de 400 caracteres con solapamiento."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "soporte-drivin",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f2d93fb1-6812-49f8-b2dd-13004682d277",
+      "name": "Recibir consulta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        624
+      ],
+      "webhookId": "soporte-drivin-final",
+      "notes": "Fuente de entrada 1: Recibe consultas POST con sessionId, cliente_email y mensaje."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-1",
+              "leftValue": "={{ $json.body.mensaje }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "cond-2",
+              "leftValue": "={{ $json.body.cliente_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d8ed6e39-4649-44c5-8a44-f108cca51bc5",
+      "name": "Validar datos entrada",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        224,
+        624
+      ],
+      "notes": "Control de errores 1: Verifica que mensaje y cliente_email no vengan vacios."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"error\": true,\n  \"mensaje\": \"Solicitud invalida: se requieren los campos cliente_email y mensaje.\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "abdef04e-b6fd-4baf-9487-80be5b09e29e",
+      "name": "Error datos incompletos",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        464,
+        848
+      ],
+      "notes": "Devuelve HTTP 400 controlado si el payload de entrada esta incompleto."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1UWGqLMr-wrSR7Ig76bRMTNqPIkW8o-IAYIZ1ybtYn5E",
+          "mode": "list",
+          "cachedResultName": "Drivin_Soporte_RAG",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UWGqLMr-wrSR7Ig76bRMTNqPIkW8o-IAYIZ1ybtYn5E/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Clientes_SLA",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UWGqLMr-wrSR7Ig76bRMTNqPIkW8o-IAYIZ1ybtYn5E/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "1099f57e-b49f-4048-89f0-719235d57724",
+      "name": "Consultar plan cliente",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        464,
+        608
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m7dfv7o0IfGh10Er",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Fuente de entrada 2: Consulta en Google Sheets el plan, estado y ejecutivo del cliente."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Consulta del usuario: {{ $('Recibir consulta').item.json.body.mensaje }}\n\nDatos del cliente en CRM/Sheets:\n- Email: {{ $('Recibir consulta').item.json.body.cliente_email }}\n- Empresa: {{ $json.empresa || 'No registrada' }}\n- Plan contratado: {{ $json.plan || 'No registrado' }}\n- Estado de cuenta: {{ $json.estado_cuenta || 'Desconocido' }}\n- Ejecutivo asignado: {{ $json.ejecutivo || 'Sin asignar' }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Eres el Agente Autonomo de Triaje y Soporte Tecnico Nivel 1 de Drivin (plataforma SaaS de gestion de transporte y logistica).\n\nTU OBJETIVO:\nAnalizar la consulta del usuario, cruzarla con los datos de su cuenta (Plan y Estado) y consultar obligatoriamente la herramienta 'buscar_faq_drivin' antes de tomar una decision operativa.\n\nREGLAS DE DECISION Y ALCANCE:\n1. Si el estado_cuenta es 'Suspendido': No des soporte tecnico operativo. Clasifica accion como 'ESCALAR_FACTURACION', prioridad 'Media' e informa amablemente que debe contactar a su ejecutivo asignado para regularizar su cuenta.\n2. Si la consulta se resuelve con el manual operativo de Drivin (app movil, POD, geocercas, roles): Clasifica accion como 'RESOLVER_DIRECTO', prioridad 'Baja' y redacta la solucion clara paso a paso.\n3. Si el cliente reporta una caida critica de API/ERP o un error tecnico no cubierto en el manual: Clasifica accion como 'ESCALAR_SOPORTE_N2'. Si su plan es 'Enterprise', asigna prioridad 'Alta'; si es 'Standard', asigna prioridad 'Media'.\n4. Si el mensaje es ambiguo o no corresponde a Drivin: Clasifica accion como 'PEDIR_ACLARACION', prioridad 'Baja' y solicita los detalles faltantes sin inventar funciones.\n\nTONO Y FORMATO:\n- Profesional, empatico, directo y en espanol.\n- Responde exclusivamente respetando el esquema JSON estructurado."
+        }
+      },
+      "id": "8f9eb424-96fe-43fa-a5c7-2897fce7207e",
+      "name": "Agente Soporte Drivin",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        704,
+        608
+      ],
+      "notes": "Cerebro del sistema: Cruza datos del cliente, consulta RAG y decide la accion en JSON."
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "a6275743-03a5-4d4c-a31e-9cbb515b9508",
+      "name": "Modelo Gemini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        624,
+        848
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "syRQm9shU3QemMSZ",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "notes": "LLM en la nube (temperatura 0.2) para razonamiento determinista."
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Recibir consulta').item.json.body.sessionId || 'default-session' }}"
+      },
+      "id": "fe29cde4-82ed-4f55-b802-f2e73184bf7e",
+      "name": "Memoria de chat",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        768,
+        848
+      ],
+      "notes": "Mantiene contexto conversacional vinculado al sessionId."
+    },
+    {
+      "parameters": {
+        "name": "buscar_faq_drivin",
+        "description": "Busca informacion tecnica oficial y politicas operativas en el manual de Drivin. Envia siempre la consulta como texto."
+      },
+      "id": "6739c503-fa75-4f38-a6d8-83d1d22ec66d",
+      "name": "Buscar en FAQ",
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1,
+      "position": [
+        896,
+        848
+      ],
+      "notes": "Herramienta RAG que conecta al agente con el Vector Store."
+    },
+    {
+      "parameters": {
+        "memoryKey": "drivin_faq_store"
+      },
+      "id": "b3013b4b-7f50-4600-a849-d3f4398fbf94",
+      "name": "Consultar memoria",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1,
+      "position": [
+        816,
+        1040
+      ],
+      "notes": "Recupera fragmentos semanticos desde drivin_faq_store."
+    },
+    {
+      "parameters": {},
+      "id": "88320d3a-be37-4db4-a694-a218bd6cbd5a",
+      "name": "Embeddings pregunta",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        816,
+        1216
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "syRQm9shU3QemMSZ",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "notes": "Vectoriza la pregunta del usuario para busqueda por similitud."
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
+      "id": "572323c9-cfee-45ea-9717-0054db3b7230",
+      "name": "Gemini auxiliar",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        1040
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "syRQm9shU3QemMSZ",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "notes": "Sintetiza los fragmentos recuperados por la herramienta RAG."
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"accion\": \"RESOLVER_DIRECTO\",\n  \"categoria\": \"App Movil\",\n  \"prioridad\": \"Baja\",\n  \"respuesta_cliente\": \"Texto claro de respuesta para el usuario\",\n  \"nota_interna\": \"Resumen breve para auditoria o escalacion\"\n}"
+      },
+      "id": "5f7193f3-f67a-43f7-97e4-4915af7fe2fe",
+      "name": "Parser JSON Salida",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1344,
+        1056
+      ],
+      "notes": "Garantiza que el agente responda siempre con estructura JSON valida."
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1UWGqLMr-wrSR7Ig76bRMTNqPIkW8o-IAYIZ1ybtYn5E",
+          "mode": "list",
+          "cachedResultName": "Drivin_Soporte_RAG",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UWGqLMr-wrSR7Ig76bRMTNqPIkW8o-IAYIZ1ybtYn5E/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1607579453,
+          "mode": "list",
+          "cachedResultName": "Registro_Tickets",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UWGqLMr-wrSR7Ig76bRMTNqPIkW8o-IAYIZ1ybtYn5E/edit#gid=1607579453"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "b293fee4-b7b4-43c3-a017-1ca2561e4c6d",
+      "name": "Registrar ticket Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1344,
+        528
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "m7dfv7o0IfGh10Er",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Canal de salida 1: Registra la decision, prioridad y auditoria en Google Sheets."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"estado\": \"ok\",\n  \"accion_tomada\": \"{{ $('Agente Soporte Drivin').item.json.output.accion }}\",\n  \"prioridad\": \"{{ $('Agente Soporte Drivin').item.json.output.prioridad }}\",\n  \"respuesta\": \"{{ $('Agente Soporte Drivin').item.json.output.respuesta_cliente }}\"\n}",
+        "options": {}
+      },
+      "id": "f64802b6-88de-4c81-930f-b30f785beaa3",
+      "name": "Enviar respuesta",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1584,
+        528
+      ],
+      "notes": "Canal de salida 2: Devuelve al usuario la respuesta clasificada y accion tomada."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"estado\": \"derivado_manual\",\n  \"mensaje\": \"Tu consulta fue recibida y derivada a un especialista humano para revision.\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "adc5183e-f38c-4ac6-a4c3-aece8a384c21",
+      "name": "Fallback derivacion manual",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        768
+      ],
+      "notes": "Plan de contingencia si el LLM falla o devuelve respuesta vacia."
+    },
+    {
+      "parameters": {
+        "content": "Botón manual para correr esta rama cada vez que actualizamos el manual.",
+        "height": 80
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -176,
+        -64
+      ],
+      "typeVersion": 1,
+      "id": "bde1a0a9-fbfc-4a7e-9e2f-e57c5d6bc3af",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Aquí guardamos el texto con las reglas de uso, app móvil, geocercas y políticas de SLA.",
+        "height": 96
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        128,
+        -80
+      ],
+      "typeVersion": 1,
+      "id": "f44ce31b-5faf-428f-a4db-aa02f4de4990",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "Parten el manual en bloques de 400 caracteres para que la búsqueda sea más exacta.",
+        "height": 80
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        656,
+        304
+      ],
+      "typeVersion": 1,
+      "id": "7e6aaca3-f7d8-48d4-a6b6-f9d789e67d85",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "Convierte los pedazos de texto a vectores usando Gemini.",
+        "height": 80
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        128,
+        320
+      ],
+      "typeVersion": 1,
+      "id": "006757b6-05df-44f9-88c3-c6e09ce29a8b",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "Guarda toda la información procesada en drivin_faq_store para que el agente la pueda consultar.",
+        "height": 96
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        656,
+        -96
+      ],
+      "typeVersion": 1,
+      "id": "a19adc75-e281-4258-adbc-ba2cbe3a7bb9",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "Webhook POST que recibe el sessionId, el correo del cliente y su pregunta.",
+        "height": 96
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -128,
+        544
+      ],
+      "typeVersion": 1,
+      "id": "8e91027f-66da-4a81-af53-600d2884b1a2",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "Revisa con un IF que el correo y el mensaje no vengan vacíos. Si falta algo, corta el flujo y responde error 400 para no gastar tokens.",
+        "height": 112
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        144,
+        512
+      ],
+      "typeVersion": 1,
+      "id": "9300ae54-d53b-4317-a698-83beed3a3d75",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "Busca el correo en Google Sheets (Clientes_SLA) para saber qué plan tiene (Enterprise o Standard) y si su cuenta está activa o suspendida.",
+        "height": 112
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        416,
+        496
+      ],
+      "typeVersion": 1,
+      "id": "80555e08-a61b-4327-9373-99fdcb23db19",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "content": "Cruza la pregunta con el plan del cliente y decide qué hacer según las reglas del System Prompt.",
+        "height": 80
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        704,
+        528
+      ],
+      "typeVersion": 1,
+      "id": "b0c61dd6-80b5-4d98-b8d6-eb21d4dffb68",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "content": "Procesan el razonamiento y resumen lo que encuentran en el manual (usamos dos variantes Flash para no saturar los límites por minuto).",
+        "height": 112
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        528,
+        976
+      ],
+      "typeVersion": 1,
+      "id": "33be0a6f-d599-46cf-9b38-b7706492974a",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "content": "Guarda el hilo de la conversación usando el sessionId.",
+        "height": 80,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        736,
+        944
+      ],
+      "typeVersion": 1,
+      "id": "788f0e8a-c8e1-47e5-a4a6-4ca5ce9b0681",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {
+        "content": "Buscan por significado dentro de drivin_faq_store usando Embeddings pregunta.",
+        "height": 96
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        992,
+        960
+      ],
+      "typeVersion": 1,
+      "id": "860bebab-e1e1-4b63-bff0-a132fedbeb65",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "content": "Obliga al agente a responder siempre con un JSON ordenado (accion, categoria, prioridad, respuesta_cliente y nota_interna).",
+        "height": 112
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1296,
+        1168
+      ],
+      "typeVersion": 1,
+      "id": "aacb0a92-053e-430c-b7e5-0844c6d8c8da",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "content": "Verifica que el agente haya devuelto una respuesta válida. Si la API falla o llega vacía, activa el Fallback y avisa que el caso pasó a revisión manual."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1040,
+        496
+      ],
+      "typeVersion": 1,
+      "id": "6ad3753b-0dbc-44ae-994a-95412ee2fb81",
+      "name": "Sticky Note13"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-out-1",
+              "leftValue": "={{ $json.output.respuesta_cliente }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d23d1579-4dc6-4790-8413-413c7ca0b508",
+      "name": "Validar respuesta IA",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        608
+      ],
+      "notes": "Control de errores 2: Valida que el agente haya generado respuesta estructurada no nula."
+    },
+    {
+      "parameters": {
+        "content": "Guarda una fila de auditoría en la pestaña Registro_Tickets con la categoría, prioridad y decisión tomada.",
+        "height": 96
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1312,
+        432
+      ],
+      "typeVersion": 1,
+      "id": "903d3b46-381b-4970-ad96-9d41c8e61154",
+      "name": "Sticky Note14"
+    },
+    {
+      "parameters": {
+        "content": "Devuelve la respuesta final al usuario por el Webhook.",
+        "height": 80
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1536,
+        656
+      ],
+      "typeVersion": 1,
+      "id": "160c1258-14b5-4109-8186-2f8e112734b2",
+      "name": "Sticky Note15"
+    }
+  ],
+  "pinData": {
+    "Recibir consulta": [
+      {
+        "json": {
+          "body": {
+            "sessionId": "ticket-001",
+            "cliente_email": "carlos.mendez@logisur.com",
+            "mensaje": "¿Un conductor puede reasignar una ruta desde su app móvil?"
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Inicio carga": {
+      "main": [
+        [
+          {
+            "node": "Texto FAQ Drivin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Texto FAQ Drivin": {
+      "main": [
+        [
+          {
+            "node": "Guardar en memoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings texto": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Guardar en memoria",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cargador de datos": {
+      "ai_document": [
+        [
+          {
+            "node": "Guardar en memoria",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Divisor de texto": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Cargador de datos",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recibir consulta": {
+      "main": [
+        [
+          {
+            "node": "Validar datos entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar datos entrada": {
+      "main": [
+        [
+          {
+            "node": "Consultar plan cliente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error datos incompletos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar plan cliente": {
+      "main": [
+        [
+          {
+            "node": "Agente Soporte Drivin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente Soporte Drivin": {
+      "main": [
+        [
+          {
+            "node": "Validar respuesta IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelo Gemini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agente Soporte Drivin",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memoria de chat": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agente Soporte Drivin",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar en FAQ": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Soporte Drivin",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar memoria": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Buscar en FAQ",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings pregunta": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Consultar memoria",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini auxiliar": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Buscar en FAQ",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser JSON Salida": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Agente Soporte Drivin",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar ticket Sheets": {
+      "main": [
+        [
+          {
+            "node": "Enviar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar respuesta IA": {
+      "main": [
+        [
+          {
+            "node": "Registrar ticket Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fallback derivacion manual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "29178a0a-fbef-4fa5-8b4e-d33ebbcd3bec",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3609da2f426be81aa0d27a662d0020e075d2da0edadb2c93600d18dea1e02d66"
+  },
+  "nodeGroups": [],
+  "id": "oe7yRP9K0KGi1I8Q",
+  "tags": []
+}
